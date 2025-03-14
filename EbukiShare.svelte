@@ -25,7 +25,7 @@
 
   // para el resto de props se propiorcionan valores por defecto
   export let platformName = 'ebuki';
-  export let platformHandle = '@ebuki.es';
+  export let platformHandle = 'ebuki.es'; // o ebuki.bsky.social, sin @
 
   // Props para colores (solo los necesarios)
   export let primaryColor = '#10b981';
