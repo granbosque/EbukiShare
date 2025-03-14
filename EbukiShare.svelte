@@ -92,6 +92,9 @@
               userHandle = sessionData.handle;
               isAuthChecked = true;
               isCheckingAuth = false;
+              
+              // Verificar si el usuario ya ha compartido este libro
+              checkIfAlreadyShared();
             })
             .catch(error => {
               console.error("Error al restaurar sesión:", error);
@@ -121,16 +124,50 @@
       isAuthChecked = true;
       isCheckingAuth = false;
     }
-
-    // Comprobar si el libro ya ha sido compartido anteriormente
-    hasAlreadyPaid = localStorage.getItem(`downloaded_${title}`) === 'true';
-    if (hasAlreadyPaid) {
-      isDownloadReady = true;
-    }
     
     // Obtener la URL actual
     currentUrl = window.location.href;
   });
+
+  // Función optimizada para verificar si el usuario ya ha compartido este libro en Bluesky
+  async function checkIfAlreadyShared() {
+    if (!isLoggedIn || !agent) return;
+    
+    try {
+      isLoading = true;
+      
+      // Extraer el dominio o parte única de la URL para la búsqueda
+      // Esto hace que la búsqueda sea más precisa
+      const urlPattern = new URL(currentUrl).pathname;
+      
+      // Usar una consulta combinada que incluya tanto el handle del usuario como parte de la URL
+      // Esto reduce significativamente los resultados a procesar
+      const query = `from:${userHandle} ${urlPattern}`;
+      
+      const response = await agent.app.bsky.feed.searchPosts({
+        q: query,
+        limit: 10 // Podemos usar un límite más bajo ya que la búsqueda es más específica
+      });
+      
+      if (response && response.data && response.data.posts) {
+        // Ahora solo verificamos si alguno de estos posts menciona a la plataforma
+        debugger;
+        const hasShared = response.data.posts.some(post => 
+          post.record.text.includes(`@${platformHandle}`)
+        );
+        
+        hasAlreadyPaid = hasShared;
+        isDownloadReady = hasShared;
+      }
+    } catch (error) {
+      console.error("Error al verificar posts anteriores:", error);
+      // En caso de error, asumimos que no ha compartido
+      hasAlreadyPaid = false;
+      isDownloadReady = false;
+    } finally {
+      isLoading = false;
+    }
+  }
 
   // Función para calcular caracteres restantes
   // TOD: revisar si funciona bien con caracteres especiales y emojis
@@ -155,8 +192,11 @@
     loginError = "";
     
     try {
+      // Eliminar la @ si el usuario la incluyó al principio
+      const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
+      
       const response = await agent.login({
-        identifier: username,
+        identifier: cleanUsername,
         password: password
       });
       
@@ -170,6 +210,9 @@
       }));
       
       password = ""; // Limpiar contraseña
+      
+      // Verificar si el usuario ya ha compartido este libro
+      await checkIfAlreadyShared();
     } catch (error) {
       loginError = "Error al iniciar sesión. Verifica tus credenciales.";
       console.error("Login error:", error);
@@ -330,8 +373,7 @@
         onShare(userHandle, bookId);
       }
       
-      // Marcar como pagado y habilitar descarga
-      localStorage.setItem(`downloaded_${title}`, 'true');
+      // Marcar como compartido y habilitar descarga
       isDownloadReady = true;
       showPostEditor = false;
       hasAlreadyPaid = true;
