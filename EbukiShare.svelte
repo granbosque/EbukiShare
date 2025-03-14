@@ -400,6 +400,10 @@
       onDownload(userHandle, bookId, format);
     }
   }
+
+  // Actualizar el contador de caracteres cuando cambia el contenido editable
+  $: postContent = userEditableContent + (bsky ? ` @${bsky}` : '') + ` (vía @${platformHandle}) ${currentUrl}`;
+  $: remainingChars = calculateRemainingChars(userEditableContent);
 </script>
 
 <style>
